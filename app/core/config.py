@@ -25,6 +25,10 @@ class Settings(BaseSettings):
 
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60
+    PLACEHOLDER_MODE: bool = Field(
+        default=True,
+        description="When True, POST /chat returns mock replies instead of invoking AI model",
+    )
 
 
 try:

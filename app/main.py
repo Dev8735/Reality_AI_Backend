@@ -26,10 +26,12 @@ def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
-# Router placeholders (to be uncommented as endpoints are implemented in later phases):
-# from app.api.routes import auth, listings, chat, boundary_search, analytics
-# app.include_router(auth.router)
-# app.include_router(listings.router)
-# app.include_router(chat.router)
-# app.include_router(boundary_search.router)
-# app.include_router(analytics.router)
+# ── Routers ──────────────────────────────────────────────────────────────
+from app.api.routes import auth, listings, chat, boundary_search, analytics
+
+app.include_router(auth.router)
+app.include_router(listings.router)
+app.include_router(chat.router)
+app.include_router(boundary_search.router)
+app.include_router(analytics.router)
+
