@@ -16,12 +16,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Analytics"])
 
 
-@router.post(
-    "/brokers/{broker_id}/analytics",
-    response_model=BrokerAnalyticsResponse,
-    deprecated=True,
-    include_in_schema=False,
-)
 @router.get(
     "/brokers/{broker_id}/analytics",
     response_model=BrokerAnalyticsResponse,
