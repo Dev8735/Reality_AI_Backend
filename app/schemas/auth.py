@@ -17,20 +17,26 @@ class RegisterRequest(BaseModel):
     )
 
 
-class TokenResponse(BaseModel):
-    """JWT token returned on successful register or login."""
-
-    access_token: str
-    token_type: str = "bearer"
-
-
-class UserResponse(BaseModel):
-    """Authenticated user profile returned by GET /auth/me."""
+class AuthUser(BaseModel):
+    """User profile data returned within TokenResponse."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    name: str
     email: EmailStr
+    name: str
     role: Literal["broker", "customer"]
+
+
+class TokenResponse(BaseModel):
+    """JWT token and authenticated user returned on successful register or login."""
+
+    access_token: str
+    token_type: str = "bearer"
+    user: AuthUser
+
+
+class UserResponse(AuthUser):
+    """Authenticated user profile returned by GET /auth/me."""
+
     created_at: datetime

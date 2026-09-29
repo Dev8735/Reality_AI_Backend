@@ -10,7 +10,7 @@ from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.security import create_access_token
 from app.models.broker import Broker
-from app.schemas.auth import RegisterRequest, TokenResponse, UserResponse
+from app.schemas.auth import AuthUser, RegisterRequest, TokenResponse, UserResponse
 from app.services.auth_service import (
     DuplicateEmailError,
     authenticate_user,
@@ -22,10 +22,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Authentication"])
 
 
+def _get_role(user: object) -> str:
+    """Determine role based on ORM instance type."""
+    return "broker" if isinstance(user, Broker) else "customer"
+
+
 def _make_subject(user: object) -> str:
     """Build the JWT ``sub`` claim in ``role:id`` format."""
-    role = "broker" if isinstance(user, Broker) else "customer"
-    return f"{role}:{user.id}"  # type: ignore[attr-defined]
+    return f"{_get_role(user)}:{user.id}"  # type: ignore[attr-defined]
+
+
+def _build_auth_user(user: object) -> AuthUser:
+    """Build the AuthUser schema from an ORM model instance."""
+    return AuthUser(
+        id=user.id,  # type: ignore[attr-defined]
+        email=user.email,  # type: ignore[attr-defined]
+        name=user.name,  # type: ignore[attr-defined]
+        role=_get_role(user),  # type: ignore[arg-type]
+    )
 
 
 @router.post(
@@ -55,7 +69,11 @@ def register(
 
     token = create_access_token(subject=_make_subject(user))
     logger.info("Registered %s id=%s", body.role, user.id)  # type: ignore[attr-defined]
-    return TokenResponse(access_token=token)
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        user=_build_auth_user(user),
+    )
 
 
 @router.post(
@@ -82,7 +100,11 @@ def login(
         )
 
     token = create_access_token(subject=_make_subject(user))
-    return TokenResponse(access_token=token)
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        user=_build_auth_user(user),
+    )
 
 
 @router.get(
@@ -94,11 +116,10 @@ def me(
     current_user=Depends(get_current_user),
 ) -> UserResponse:
     """Fetch the profile of the user identified by the Bearer JWT."""
-    role = "broker" if isinstance(current_user, Broker) else "customer"
     return UserResponse(
         id=current_user.id,
         name=current_user.name,
         email=current_user.email,
-        role=role,
+        role=_get_role(current_user),  # type: ignore[arg-type]
         created_at=current_user.created_at,
     )
