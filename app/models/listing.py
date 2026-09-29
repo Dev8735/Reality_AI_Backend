@@ -52,7 +52,7 @@ class Listing(Base):
     description = Column(Text, nullable=True)
     price = Column(Numeric(12, 2), nullable=False)
     property_type = Column(String, nullable=False)
-    location = Column(Geometry("POINT", srid=4326), nullable=False)
+    location = Column(Geometry("POINT", srid=4326, spatial_index=False), nullable=False)
     carpet_area = Column(Numeric, nullable=True)
     built_up_area = Column(Numeric, nullable=True)
     plot_area = Column(Numeric, nullable=True)

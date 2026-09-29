@@ -22,6 +22,14 @@ class TestRegister:
         data = resp.json()
         assert "access_token" in data
         assert data["token_type"] == "bearer"
+        assert "user" in data
+        assert data["user"] == {
+            "id": data["user"]["id"],
+            "email": "newbroker@test.com",
+            "name": "New Broker",
+            "role": "broker",
+        }
+        assert isinstance(data["user"]["id"], int)
 
     def test_register_customer_success(self, client: TestClient):
         unique_email = f"newcustomer_{uuid.uuid4().hex[:8]}@test.com"
@@ -32,7 +40,17 @@ class TestRegister:
             "role": "customer",
         })
         assert resp.status_code == 201
-        assert "access_token" in resp.json()
+        data = resp.json()
+        assert "access_token" in data
+        assert data["token_type"] == "bearer"
+        assert "user" in data
+        assert data["user"] == {
+            "id": data["user"]["id"],
+            "email": "newcustomer@test.com",
+            "name": "New Customer",
+            "role": "customer",
+        }
+        assert isinstance(data["user"]["id"], int)
 
     def test_register_duplicate_email_409(self, client: TestClient):
         register_broker(client, email="dup@test.com")
@@ -67,6 +85,14 @@ class TestLogin:
         data = resp.json()
         assert "access_token" in data
         assert data["token_type"] == "bearer"
+        assert "user" in data
+        assert data["user"] == {
+            "id": data["user"]["id"],
+            "email": "login@test.com",
+            "name": "Test Broker",
+            "role": "broker",
+        }
+        assert isinstance(data["user"]["id"], int)
 
     def test_login_wrong_password_401(self, client: TestClient):
         register_broker(client, email="wrongpw@test.com")
@@ -83,3 +109,18 @@ class TestLogin:
             "password": "whatever123",
         })
         assert resp.status_code == 401
+
+
+class TestMe:
+    """GET /auth/me."""
+
+    def test_me_success(self, client: TestClient):
+        reg = register_broker(client, email="me@test.com")
+        token = reg["access_token"]
+        resp = client.get("/auth/me", headers=auth_header(token))
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["email"] == "me@test.com"
+        assert data["name"] == "Test Broker"
+        assert data["role"] == "broker"
+        assert "created_at" in data
