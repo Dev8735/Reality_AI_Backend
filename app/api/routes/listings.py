@@ -94,6 +94,23 @@ def create_listing(
 
 
 @router.get(
+    "/listings/search",
+    response_model=list[ListingResponse],
+    summary="Search listings by radius around a point",
+)
+def search_listings(
+    lat: float = Query(..., ge=-90, le=90, description="Latitude"),
+    lng: float = Query(..., ge=-180, le=180, description="Longitude"),
+    radius_km: float = Query(..., gt=0, le=100, description="Search radius in km"),
+    limit: int = Query(20, ge=1, le=100, description="Max results"),
+    db: Session = Depends(get_db),
+) -> list[ListingResponse]:
+    """Return listings within *radius_km* of the given lat/lng."""
+    results = geo_service.search_by_radius(db, lat=lat, lng=lng, radius_km=radius_km, limit=limit)
+    return results  # type: ignore[return-value]
+
+
+@router.get(
     "/listings/{listing_id}",
     response_model=ListingResponse,
     summary="Fetch a single listing by ID",
@@ -110,20 +127,3 @@ def get_listing(
             detail=f"Listing with id {listing_id} not found",
         )
     return listing  # type: ignore[return-value]
-
-
-@router.get(
-    "/listings/search",
-    response_model=list[ListingResponse],
-    summary="Search listings by radius around a point",
-)
-def search_listings(
-    lat: float = Query(..., ge=-90, le=90, description="Latitude"),
-    lng: float = Query(..., ge=-180, le=180, description="Longitude"),
-    radius_km: float = Query(..., gt=0, le=100, description="Search radius in km"),
-    limit: int = Query(20, ge=1, le=100, description="Max results"),
-    db: Session = Depends(get_db),
-) -> list[ListingResponse]:
-    """Return listings within *radius_km* of the given lat/lng."""
-    results = geo_service.search_by_radius(db, lat=lat, lng=lng, radius_km=radius_km, limit=limit)
-    return results  # type: ignore[return-value]

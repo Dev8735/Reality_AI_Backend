@@ -130,6 +130,7 @@ def seed(
             customer = Customer(
                 name=fake.name(),
                 email=fake.unique.email(),
+                password_hash=dummy_hash,
             )
             db.add(customer)
             customers.append(customer)
