@@ -83,21 +83,16 @@ create_table_if_missing("conversation")
 create_table_if_missing("lead")
 
 # ── 3. Stamp alembic version ──────────────────────────────────────────────────
-print("Stamping alembic_version...")
-with engine.connect() as conn:
-    conn.execute(text(
-        "CREATE TABLE IF NOT EXISTS alembic_version "
-        "(version_num VARCHAR(32) NOT NULL PRIMARY KEY)"
-    ))
-    exists = conn.execute(
-        text("SELECT 1 FROM alembic_version WHERE version_num = '001_gist_index'")
-    ).fetchone()
-    if not exists:
-        conn.execute(
-            text("INSERT INTO alembic_version (version_num) VALUES ('001_gist_index')")
-        )
-    conn.commit()
-print("  Alembic stamped at 001_gist_index")
+print("Stamping alembic to latest migration...")
+import subprocess
+result = subprocess.run(
+    [sys.executable, "-m", "alembic", "stamp", "head"],
+    capture_output=True, text=True
+)
+if result.returncode == 0:
+    print("  Alembic stamped at head")
+else:
+    print(f"  Alembic stamp failed: {result.stderr.strip()}")
 
 # ── 4. GiST index on listing.location ────────────────────────────────────────
 print("Ensuring GiST index on listing.location...")

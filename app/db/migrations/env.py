@@ -26,6 +26,22 @@ config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 target_metadata = Base.metadata
 
+# ── Autogenerate filters ──────────────────────────────────────────────────
+# PostGIS installs many tables (tiger geocoder, topology, spatial_ref_sys,
+# geometry_columns, etc.) that we must NOT include in migrations.
+# Whitelist approach: only track tables registered in our ORM metadata.
+_APP_TABLES = set(target_metadata.tables.keys())
+
+
+def _include_object(obj, name, type_, reflected, compare_to):
+    """Only include ORM-registered tables in autogenerate diffs."""
+    if type_ == "table":
+        return name in _APP_TABLES
+    # Include columns, indexes, etc. only if they belong to an app table
+    if hasattr(obj, "table") and hasattr(obj.table, "name"):
+        return obj.table.name in _APP_TABLES
+    return True
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
@@ -35,6 +51,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=_include_object,
     )
 
     with context.begin_transaction():
@@ -53,6 +70,7 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
+            include_object=_include_object,
         )
 
         with context.begin_transaction():

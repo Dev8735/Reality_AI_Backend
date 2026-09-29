@@ -1,38 +1,43 @@
-version: "3.8"
-
 services:
-  # ─────────────────────────────────────────────────────────────────────────
-  # PostGIS + pgvector database
-  # ─────────────────────────────────────────────────────────────────────────
+  # PostgreSQL + PostGIS + pgvector
   db:
-    image: postgis/postgis:16-3.4
+    build:
+      context: .
+      dockerfile: ./docker/postgres/Dockerfile
     container_name: reality_ai_db
     restart: always
+
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-reality_ai}
+
     ports:
       - "5432:5432"
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./app/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-reality_ai}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-reality_ai}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
-  # ─────────────────────────────────────────────────────────────────────────
-  # FastAPI backend (auto-migrates then starts Uvicorn via entrypoint.sh)
-  # ─────────────────────────────────────────────────────────────────────────
+  # FastAPI backend
   api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./Dockerfile
     container_name: reality_ai_api
     restart: on-failure
-    # DATABASE_URL points to 'db' hostname inside the Docker network (not localhost)
+
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-reality_ai}
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-reality-ai-surat-2026}
@@ -40,29 +45,30 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-reality_ai}
+
     ports:
       - "8000:8000"
+
     depends_on:
       db:
         condition: service_healthy
-    # Source mount for hot-reload in dev (remove for a clean prod build)
+
     volumes:
       - .:/app
 
-  # ─────────────────────────────────────────────────────────────────────────
-  # pgAdmin 4 — optional web UI for inspecting the DB
-  # Access at http://localhost:5050 | login: admin@reality.ai / admin
-  # Comment out this block if you don't need it
-  # ─────────────────────────────────────────────────────────────────────────
+  # pgAdmin 4
   db_admin:
     image: dpage/pgadmin4:latest
     container_name: reality_ai_pgadmin
     restart: on-failure
+
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@reality.ai
       PGADMIN_DEFAULT_PASSWORD: admin
+
     ports:
       - "5050:80"
+
     depends_on:
       - db
 
