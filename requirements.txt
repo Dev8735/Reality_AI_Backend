@@ -35,4 +35,4 @@ shapely>=2.0.0,<3.0.0
 email-validator>=2.1.0,<3.0.0
 # Form data parser for FastAPI OAuth2PasswordRequestForm login
 python-multipart>=0.0.9,<1.0.0
-
+psycopg
