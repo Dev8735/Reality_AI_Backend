@@ -58,9 +58,9 @@ class Listing(Base):
     plot_area = Column(Numeric, nullable=True)
     floor_number = Column(Integer, nullable=True)
     rooms = Column(JSON, nullable=True)
-    # TODO: CONFIRM embedding dimension with Person 1 (AI track) before
-    # Phase 1's migration is finalized — this WILL require a migration change
-    # if wrong, since existing data can't easily be resized.
+    # CONFIRMED: Embedding dimension = 384 (sentence-transformers all-MiniLM-L6-v2,
+    # as confirmed with Person 1 / AI track). Changing this requires a DB migration
+    # since existing data can't be resized in-place.
     # NOTE: Falls back to JSON when pgvector extension is not installed in local Postgres.
     # Set USE_PGVECTOR=true in environment when pgvector extension is present in PostgreSQL.
     embedding = Column(
