@@ -6,10 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.security import create_access_token
 from app.models.broker import Broker
-from app.schemas.auth import RegisterRequest, TokenResponse
+from app.schemas.auth import RegisterRequest, TokenResponse, UserResponse
 from app.services.auth_service import (
     DuplicateEmailError,
     authenticate_user,
@@ -82,3 +83,22 @@ def login(
 
     token = create_access_token(subject=_make_subject(user))
     return TokenResponse(access_token=token)
+
+
+@router.get(
+    "/auth/me",
+    response_model=UserResponse,
+    summary="Return the currently authenticated user's profile",
+)
+def me(
+    current_user=Depends(get_current_user),
+) -> UserResponse:
+    """Fetch the profile of the user identified by the Bearer JWT."""
+    role = "broker" if isinstance(current_user, Broker) else "customer"
+    return UserResponse(
+        id=current_user.id,
+        name=current_user.name,
+        email=current_user.email,
+        role=role,
+        created_at=current_user.created_at,
+    )

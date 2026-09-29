@@ -1,8 +1,9 @@
 """Pydantic schemas for authentication request/response payloads."""
 
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class RegisterRequest(BaseModel):
@@ -21,3 +22,15 @@ class TokenResponse(BaseModel):
 
     access_token: str
     token_type: str = "bearer"
+
+
+class UserResponse(BaseModel):
+    """Authenticated user profile returned by GET /auth/me."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    email: EmailStr
+    role: Literal["broker", "customer"]
+    created_at: datetime

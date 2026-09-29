@@ -30,6 +30,8 @@ class TestChat:
         data = resp.json()
         assert "reply" in data
         assert "listings" in data
+        assert "conversation_id" in data
+        assert isinstance(data["conversation_id"], int)
         assert "[PLACEHOLDER MODE]" in data["reply"]
 
     def test_chat_unauthenticated_401(self, client: TestClient):

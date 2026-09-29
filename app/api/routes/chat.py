@@ -13,7 +13,12 @@ from app.core.database import get_db
 from app.models.conversation import Conversation
 from app.models.customer import Customer
 from app.models.listing import Listing
-from app.schemas.chat import ChatRequest, ChatResponse
+from app.schemas.chat import (
+    ChatHistoryResponse,
+    ChatMessageResponse,
+    ChatRequest,
+    ChatResponse,
+)
 from app.schemas.listing import ListingResponse
 
 logger = logging.getLogger(__name__)
@@ -101,7 +106,7 @@ def _generate_response(
 
 
 # ---------------------------------------------------------------------------
-# Endpoint
+# Endpoints
 # ---------------------------------------------------------------------------
 
 
@@ -167,4 +172,70 @@ def chat(
         ListingResponse.model_validate(l) for l in listings
     ]
 
-    return ChatResponse(reply=reply_text, listings=listing_responses)
+    return ChatResponse(
+        conversation_id=conversation.id,
+        reply=reply_text,
+        listings=listing_responses,
+    )
+
+
+@router.get(
+    "/chat/{conversation_id}",
+    response_model=ChatHistoryResponse,
+    summary="Fetch the full chat history for a conversation",
+)
+def get_chat_history(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> ChatHistoryResponse:
+    """Return the complete message history for the given conversation.
+
+    Only the owning customer may access their conversation.
+    """
+    conversation = (
+        db.query(Conversation)
+        .filter(
+            Conversation.id == conversation_id,
+            Conversation.customer_id == current_user.id,
+        )
+        .first()
+    )
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conversation {conversation_id} not found",
+        )
+
+    raw_messages = conversation.messages or []
+    parsed_messages: list[ChatMessageResponse] = []
+
+    for msg in raw_messages:
+        role = msg.get("role", "user")
+        sender = role if role in ("user", "assistant") else "user"
+        content = msg.get("content", "")
+        ts_raw = msg.get("timestamp")
+
+        # Parse timestamp — stored as ISO-8601 string
+        if ts_raw:
+            try:
+                ts = datetime.fromisoformat(ts_raw)
+            except (ValueError, TypeError):
+                ts = datetime.now(timezone.utc)
+        else:
+            ts = datetime.now(timezone.utc)
+
+        parsed_messages.append(
+            ChatMessageResponse(
+                sender=sender,
+                message=content,
+                timestamp=ts,
+                listings=[],  # listings are not stored per-message currently
+            )
+        )
+
+    return ChatHistoryResponse(
+        conversation_id=conversation.id,
+        user_id=conversation.customer_id,
+        messages=parsed_messages,
+    )

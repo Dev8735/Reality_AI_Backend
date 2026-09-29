@@ -65,11 +65,7 @@ def register_user(
     if role == "broker":
         user = Broker(name=name, email=email, password_hash=hashed)
     else:
-        # Customer model has no password_hash column in AGENTS.md §4.
-        # We store password_hash in a lightweight way for now — if the team
-        # decides customers don't need passwords (e.g. magic-link auth),
-        # this can be revisited.
-        user = Customer(name=name, email=email)
+        user = Customer(name=name, email=email, password_hash=hashed)
 
     db.add(user)
     db.commit()
