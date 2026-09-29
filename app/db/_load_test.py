@@ -85,20 +85,15 @@ def run_load_test(host: str, n_requests: int, n_workers: int, token: str | None)
     # Endpoint 1 — GET /listings/search (radius)                          #
     # No auth required                                                     #
     # ------------------------------------------------------------------ #
+    client = httpx.Client(base_url=host, timeout=30)
+
     def _radius_request() -> None:
-        with httpx.Client(base_url=host, timeout=30) as client:
-            resp = client.get("/listings/search", params=_RADIUS_PARAMS)
-        # Don't assert — we want latency even on errors (track separately)
+        resp = client.get("/listings/search", params=_RADIUS_PARAMS)
         if resp.status_code not in (200, 422):
             print(f"  [radius] unexpected status {resp.status_code}", flush=True)
 
-    # ------------------------------------------------------------------ #
-    # Endpoint 2 — POST /listings/search-boundary (polygon)               #
-    # No auth required                                                     #
-    # ------------------------------------------------------------------ #
     def _boundary_request() -> None:
-        with httpx.Client(base_url=host, timeout=30) as client:
-            resp = client.post("/listings/search-boundary", json=_BOUNDARY_PAYLOAD)
+        resp = client.post("/listings/search-boundary", json=_BOUNDARY_PAYLOAD)
         if resp.status_code not in (200, 422):
             print(f"  [boundary] unexpected status {resp.status_code}", flush=True)
 

@@ -1,5 +1,6 @@
 """Tests for authentication endpoints — POST /auth/register and POST /auth/login."""
 
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 
@@ -10,8 +11,9 @@ class TestRegister:
     """POST /auth/register."""
 
     def test_register_broker_success(self, client: TestClient):
+        unique_email = f"newbroker_{uuid.uuid4().hex[:8]}@test.com"
         resp = client.post("/auth/register", json={
-            "email": "newbroker@test.com",
+            "email": unique_email,
             "password": "securepass1",
             "name": "New Broker",
             "role": "broker",
@@ -30,8 +32,9 @@ class TestRegister:
         assert isinstance(data["user"]["id"], int)
 
     def test_register_customer_success(self, client: TestClient):
+        unique_email = f"newcustomer_{uuid.uuid4().hex[:8]}@test.com"
         resp = client.post("/auth/register", json={
-            "email": "newcustomer@test.com",
+            "email": unique_email,
             "password": "securepass1",
             "name": "New Customer",
             "role": "customer",

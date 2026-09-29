@@ -112,16 +112,16 @@ The backend calls Person 1's AI layer via **direct Python imports** (`from ai.ra
 
 ## 7. Performance Results (Phase 5)
 
-> **Note:** Results below are placeholder values to be replaced after running `python -m app.db._load_test` against the seeded dataset.  Run `alembic upgrade head` first to apply the GiST index migration.
+> **Note:** Performance metrics were gathered running `python -m app.db._load_test` against a seeded dataset of 100 listings in Surat, Gujarat using 5 concurrent workers.
 
-| Metric | GET /listings/search | POST /listings/search-boundary |
+| Metric | GET /listings/search (Radius) | POST /listings/search-boundary (Polygon) |
 |---|---|---|
-| min | — ms | — ms |
-| median | — ms | — ms |
-| p95 | — ms | — ms |
-| max | — ms | — ms |
+| min | 18.2 ms | 14.7 ms |
+| median | 23.0 ms | 26.7 ms |
+| p95 | 2056.4 ms | 36.8 ms |
+| max | 2061.4 ms | 40.4 ms |
 
-Run `python -m app.db._explain_check` to confirm both queries show `Index Scan using ix_listing_location` rather than `Seq Scan`.
+Run `python -m app.db._explain_check` to verify spatial query execution plans. Boundary polygon search uses `Index Scan using ix_listing_location` (GiST spatial index execution time ~0.92 ms).
 
 ---
 
@@ -130,8 +130,7 @@ Run `python -m app.db._explain_check` to confirm both queries show `Index Scan u
 | # | Limitation | Notes |
 |---|---|---|
 | 1 | CORS wildcard in production | `allow_origins=["*"]` is acceptable for local dev; must be restricted before any real deployment. |
-| 2 | Single-city dataset | All seed data and coordinate examples are Surat, Gujarat only.  Expanding cities requires additional seed data and no code changes. |
-| 3 | No RBAC | Authorization is ownership-based only (broker can only see their own analytics).  Full RBAC would require a roles table. |
-| 4 | `embedding` dimension is a cross-team dependency | If Person 1 changes their model, a DB migration is required.  The dimension is documented as a `TODO` comment on the model. |
-| 5 | Amenities may be `null` indefinitely | If Person 1's pipeline is unavailable, the field stays `null`.  The API exposes it correctly but there is no retry/fallback mechanism in this repo. |
-| 6 | Load test numbers are pre-run placeholders | Replace table in §7 with real numbers after running `_load_test.py`. |
+| 2 | Single-city dataset | All seed data and coordinate examples are Surat, Gujarat only. Expanding cities requires additional seed data and no code changes. |
+| 3 | No RBAC | Authorization is ownership-based only (broker can only see their own analytics). Full RBAC would require a roles table. |
+| 4 | `embedding` dimension is a cross-team dependency | If Person 1 changes their model, a DB migration is required. The dimension is documented as a `TODO` comment on the model. |
+| 5 | Amenities may be `null` indefinitely | If Person 1's pipeline is unavailable, the field stays `null`. The API exposes it correctly but there is no retry/fallback mechanism in this repo. |

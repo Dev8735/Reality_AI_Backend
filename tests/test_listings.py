@@ -102,13 +102,14 @@ class TestSearchListings:
         assert len(results) >= 1
 
     def test_radius_search_excludes_distant(self, client: TestClient):
-        """Seed a listing at Adajan, search from Vesu with 1km radius — should NOT appear."""
+        """Seed a listing at Adajan, search from Vesu with 1km radius — the Adajan listing should NOT appear."""
         token = register_broker(client)["access_token"]
-        client.post(
+        create_resp = client.post(
             "/listings",
             json=_listing_payload(),  # at Adajan
             headers=auth_header(token),
         )
+        adajan_listing_id = create_resp.json()["id"]
 
         resp = client.get("/listings/search", params={
             "lat": VESU["lat"],
@@ -117,4 +118,7 @@ class TestSearchListings:
         })
         assert resp.status_code == 200
         results = resp.json()
-        assert len(results) == 0
+        result_ids = [r["id"] for r in results]
+        assert adajan_listing_id not in result_ids, (
+            f"Adajan listing {adajan_listing_id} should NOT appear in a 1km Vesu search"
+        )
