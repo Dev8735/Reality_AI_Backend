@@ -21,7 +21,7 @@
 
 `listing.location` uses GeoAlchemy2's `Geometry("POINT", srid=4326)`.  SRID 4326 (WGS-84) was chosen because it is the universal standard for GPS coordinates and is required by the PostGIS geography cast (`::`geography`) used in radius queries.
 
-A GiST index (`ix_listing_location`, Phase 5 migration `001_gist_index`) is applied via `postgresql_using='gist'` — the only index type PostGIS supports for geometry columns.  Without it, both `ST_DWithin` and `ST_Contains` fall back to a full sequential scan.
+A GiST index (`idx_listing_location`, alongside functional geography index `idx_listing_location_geog`) is applied via `postgresql_using='gist'` — the spatial index type PostGIS supports for geometry columns.  Without it, both `ST_DWithin` and `ST_Contains` fall back to a full sequential scan.
 
 ### Vector Column
 

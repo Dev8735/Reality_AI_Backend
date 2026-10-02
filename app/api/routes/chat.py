@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.conversation import Conversation
 from app.models.customer import Customer
+from app.models.lead import Lead
 from app.models.listing import Listing
 from app.schemas.chat import (
     ChatHistoryResponse,
@@ -120,7 +121,11 @@ def chat(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> ChatResponse:
-    """Process a customer chat message, update conversation, and generate reply."""
+    if not isinstance(current_user, Customer):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only customers can initiate or participate in chat sessions",
+        )
 
     # 1. Load or create Conversation
     if body.conversation_id:
@@ -153,14 +158,25 @@ def chat(
     candidate_ids = _get_polygon_candidates(body.polygon)
     listings = _retrieve_listings(db, body.message, candidate_ids)
 
+    # Record leads for retrieved listings (tracks customer inquiry per listing)
+    for l in listings:
+        existing_lead = (
+            db.query(Lead)
+            .filter(Lead.listing_id == l.id, Lead.customer_id == current_user.id)
+            .first()
+        )
+        if not existing_lead:
+            db.add(Lead(listing_id=l.id, customer_id=current_user.id))
+
     # 5. Generate assistant reply
     reply_text = _generate_response(body.message, listings, messages)
 
-    # 6. Append assistant message
+    # 6. Append assistant message (include listing IDs for history recall)
     assistant_msg = {
         "role": "assistant",
         "content": reply_text,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "listing_ids": [l.id for l in listings],
     }
     messages.append(assistant_msg)
 
@@ -193,6 +209,12 @@ def get_chat_history(
 
     Only the owning customer may access their conversation.
     """
+    if not isinstance(current_user, Customer):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only customers can view chat history",
+        )
+
     conversation = (
         db.query(Conversation)
         .filter(
@@ -208,6 +230,26 @@ def get_chat_history(
         )
 
     raw_messages = conversation.messages or []
+
+    # Collect all listing IDs referenced by assistant messages (handling int or string IDs)
+    all_listing_ids: set[int] = set()
+    for msg in raw_messages:
+        lids = msg.get("listing_ids") or []
+        for lid in lids:
+            try:
+                all_listing_ids.add(int(lid))
+            except (ValueError, TypeError):
+                pass
+
+    # Batch-load listings from DB in a single query
+    listings_map: dict[int, ListingResponse] = {}
+    if all_listing_ids:
+        db_listings = (
+            db.query(Listing).filter(Listing.id.in_(all_listing_ids)).all()
+        )
+        for l in db_listings:
+            listings_map[l.id] = ListingResponse.model_validate(l)
+
     parsed_messages: list[ChatMessageResponse] = []
 
     for msg in raw_messages:
@@ -225,17 +267,33 @@ def get_chat_history(
         else:
             ts = datetime.now(timezone.utc)
 
+        # Attach listings for assistant messages using stored IDs
+        msg_lids = []
+        for lid in msg.get("listing_ids", []):
+            try:
+                msg_lids.append(int(lid))
+            except (ValueError, TypeError):
+                pass
+
+        msg_listings = [
+            listings_map[lid]
+            for lid in msg_lids
+            if lid in listings_map
+        ]
+
         parsed_messages.append(
             ChatMessageResponse(
                 sender=sender,
                 message=content,
                 timestamp=ts,
-                listings=[],  # listings are not stored per-message currently
+                listings=msg_listings,
             )
         )
 
+    # Return top-level listings as well so frontend gets all conversation listings
     return ChatHistoryResponse(
         conversation_id=conversation.id,
         user_id=conversation.customer_id,
         messages=parsed_messages,
+        listings=list(listings_map.values()),
     )

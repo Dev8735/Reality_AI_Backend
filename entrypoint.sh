@@ -7,8 +7,12 @@ set -e
 echo "⏳ Waiting for PostgreSQL to be ready..."
 until python -c "
 import sys, os
-import psycopg2
 try:
+    import psycopg
+    psycopg.connect(os.environ['DATABASE_URL'])
+    print('PostgreSQL is ready.')
+except ImportError:
+    import psycopg2
     psycopg2.connect(os.environ['DATABASE_URL'])
     print('PostgreSQL is ready.')
 except Exception as e:

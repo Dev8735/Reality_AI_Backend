@@ -96,17 +96,30 @@ def create_listing(
 @router.get(
     "/listings/search",
     response_model=list[ListingResponse],
-    summary="Search listings by radius around a point",
+    summary="Search listings by radius around a point with optional price and property type filters",
 )
 def search_listings(
     lat: float = Query(..., ge=-90, le=90, description="Latitude"),
     lng: float = Query(..., ge=-180, le=180, description="Longitude"),
     radius_km: float = Query(..., gt=0, le=100, description="Search radius in km"),
+    price_min: Optional[float] = Query(None, ge=0, description="Minimum price filter"),
+    price_max: Optional[float] = Query(None, ge=0, description="Maximum price filter"),
+    property_type: Optional[str] = Query(None, description="Filter by property type ('flat' or 'house_land')"),
     limit: int = Query(20, ge=1, le=100, description="Max results"),
     db: Session = Depends(get_db),
 ) -> list[ListingResponse]:
-    """Return listings within *radius_km* of the given lat/lng."""
-    results = geo_service.search_by_radius(db, lat=lat, lng=lng, radius_km=radius_km, limit=limit)
+    """Return listings within *radius_km* of the given lat/lng matching optional filters."""
+    filters = {}
+    if price_min is not None:
+        filters["price_min"] = price_min
+    if price_max is not None:
+        filters["price_max"] = price_max
+    if property_type is not None:
+        filters["property_type"] = property_type
+
+    results = geo_service.search_by_radius(
+        db, lat=lat, lng=lng, radius_km=radius_km, limit=limit, filters=filters
+    )
     return results  # type: ignore[return-value]
 
 

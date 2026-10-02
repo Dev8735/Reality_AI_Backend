@@ -18,6 +18,8 @@ from app.core.security import hash_password
 from app.models.broker import Broker
 from app.models.customer import Customer
 from app.models.listing import Listing
+from app.models.lead import Lead
+from app.models.conversation import Conversation
 
 fake = Faker("en_IN")
 
@@ -98,7 +100,7 @@ def _make_rooms(prop_type: str) -> dict:
 
 
 def seed(
-    n_listings: int = 100,
+    n_listings: int = 500,
     n_brokers: int = 10,
     n_customers: int = 30,
 ) -> None:
@@ -138,6 +140,7 @@ def seed(
         print(f"  Created {len(customers)} customers")
 
         # ── Listings ────────────────────────────────────────────
+        listings: list[Listing] = []
         for i in range(n_listings):
             prop_type = random.choice(["flat", "house_land"])
             base_coord = random.choice(REAL_CITY_COORDS)
@@ -166,13 +169,40 @@ def seed(
                 plot_area=round(plot, 2) if plot else None,
                 floor_number=floor,
                 rooms=_make_rooms(prop_type),
-                # embedding and amenities left NULL — populated by AI pipeline
             )
             db.add(listing)
+            listings.append(listing)
+
+        db.flush()
+        print(f"  Created {n_listings} listings")
+
+        # ── Leads ───────────────────────────────────────────────
+        leads_count = 0
+        for customer in customers:
+            # Randomly associate customer with 1-3 listings as leads
+            sample_listings = random.sample(listings, k=random.randint(1, 3))
+            for l in sample_listings:
+                db.add(Lead(listing_id=l.id, customer_id=customer.id))
+                leads_count += 1
+        db.flush()
+        print(f"  Created {leads_count} leads")
+
+        # ── Conversations ──────────────────────────────────────
+        conv_count = 0
+        for customer in customers[:10]:
+            conv = Conversation(
+                customer_id=customer.id,
+                messages=[
+                    {"role": "user", "content": "Looking for 2BHK flats in Adajan", "timestamp": "2026-10-01T10:00:00Z"},
+                    {"role": "assistant", "content": "[PLACEHOLDER MODE] Here are top properties in Adajan", "timestamp": "2026-10-01T10:00:02Z", "listing_ids": [listings[0].id]}
+                ]
+            )
+            db.add(conv)
+            conv_count += 1
+        print(f"  Created {conv_count} sample conversations")
 
         db.commit()
-        print(f"  Created {n_listings} listings")
-        print(f"\nSeed complete: {n_brokers} brokers, {n_customers} customers, {n_listings} listings")
+        print(f"\nSeed complete: {n_brokers} brokers, {n_customers} customers, {n_listings} listings, {leads_count} leads, {conv_count} conversations")
 
     finally:
         db.close()
@@ -180,7 +210,7 @@ def seed(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed Reality AI database with synthetic data")
-    parser.add_argument("-n", "--n-listings", type=int, default=100, help="Number of listings")
+    parser.add_argument("-n", "--n-listings", type=int, default=500, help="Number of listings")
     parser.add_argument("--n-brokers", type=int, default=10, help="Number of brokers")
     parser.add_argument("--n-customers", type=int, default=30, help="Number of customers")
     parser.add_argument(

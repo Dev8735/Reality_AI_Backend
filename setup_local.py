@@ -95,15 +95,19 @@ else:
     print(f"  Alembic stamp failed: {result.stderr.strip()}")
 
 # ── 4. GiST index on listing.location ────────────────────────────────────────
-print("Ensuring GiST index on listing.location...")
+print("Ensuring GiST indices on listing.location...")
 try:
     with engine.connect() as conn:
         conn.execute(text(
-            "CREATE INDEX IF NOT EXISTS ix_listing_location "
+            "CREATE INDEX IF NOT EXISTS idx_listing_location "
             "ON listing USING gist (location);"
         ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_listing_location_geog "
+            "ON listing USING gist (CAST(location AS geography));"
+        ))
         conn.commit()
-    print("  GiST index ... OK")
+    print("  GiST indices ... OK")
 except Exception as e:
     print(f"  GiST index skipped: {e}")
 

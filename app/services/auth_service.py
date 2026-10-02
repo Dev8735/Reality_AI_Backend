@@ -55,9 +55,10 @@ def register_user(
     DuplicateEmailError
         If a row with the same email already exists for the given role.
     """
-    model_cls = Broker if role == "broker" else Customer
-    existing = db.query(model_cls).filter(model_cls.email == email).first()
-    if existing:
+    # Check both Broker and Customer tables for email collision
+    existing_broker = db.query(Broker).filter(Broker.email == email).first()
+    existing_customer = db.query(Customer).filter(Customer.email == email).first()
+    if existing_broker or existing_customer:
         raise DuplicateEmailError(f"An account with email {email!r} already exists")
 
     hashed = hash_password(password)

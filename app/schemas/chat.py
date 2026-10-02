@@ -56,3 +56,7 @@ class ChatHistoryResponse(BaseModel):
         default_factory=list,
         description="Ordered list of messages in the conversation",
     )
+    listings: list[ListingResponse] = Field(
+        default_factory=list,
+        description="All listings referenced across assistant messages in this conversation",
+    )

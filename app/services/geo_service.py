@@ -14,6 +14,7 @@ def search_by_radius(
     lng: float,
     radius_km: float,
     limit: int = 20,
+    filters: dict | None = None,
 ) -> list[Listing]:
     """Return listings within *radius_km* of the given point.
 
@@ -53,16 +54,24 @@ def search_by_radius(
     point = WKTElement(f"POINT({lng} {lat})", srid=4326)
     radius_m = radius_km * 1000
 
-    return (
-        db.query(Listing)
-        .filter(
-            func.ST_DWithin(
-                cast(Listing.location, Geography),
-                cast(point, Geography),
-                radius_m,
-            )
+    query = db.query(Listing).filter(
+        func.ST_DWithin(
+            cast(Listing.location, Geography),
+            cast(point, Geography),
+            radius_m,
         )
-        .order_by(
+    )
+
+    if filters:
+        if "price_min" in filters and filters["price_min"] is not None:
+            query = query.filter(Listing.price >= filters["price_min"])
+        if "price_max" in filters and filters["price_max"] is not None:
+            query = query.filter(Listing.price <= filters["price_max"])
+        if "property_type" in filters and filters["property_type"] is not None:
+            query = query.filter(Listing.property_type == filters["property_type"])
+
+    return (
+        query.order_by(
             func.ST_Distance(
                 cast(Listing.location, Geography),
                 cast(point, Geography),

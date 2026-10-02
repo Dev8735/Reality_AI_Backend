@@ -23,6 +23,8 @@ class BoundarySearchRequest(BaseModel):
         """Ensure valid coordinates, minimum 3 vertices, and auto-close the ring."""
         if len(points) < 3:
             raise ValueError("Polygon must contain at least 3 points")
+        if len(points) > 100:
+            raise ValueError("Polygon vertex count exceeds maximum limit of 100 points")
 
         for idx, pt in enumerate(points):
             if not isinstance(pt, (list, tuple)) or len(pt) != 2:

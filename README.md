@@ -76,10 +76,9 @@
 ├── tests/                        # Comprehensive Pytest test suite
 │   ├── test_analytics.py
 │   ├── test_auth.py
-│   ├── test_boundary_search.py
+│   ├── test_boundary.py
 │   ├── test_chat.py
-│   ├── test_listings.py
-│   └── test_seed_synthetic_data.py
+│   └── test_listings.py
 ├── .env.example                  # Template for environment variables
 ├── alembic.ini                   # Alembic configuration
 ├── docker-compose.yml            # Multi-container orchestration (API + PostGIS DB + pgAdmin)

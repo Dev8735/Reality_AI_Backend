@@ -48,3 +48,12 @@ class TestBoundarySearch:
             json={"polygon": [[21.1702, 72.8311], [21.1800, 72.8400]]},
         )
         assert resp.status_code == 422
+
+    def test_boundary_search_exceeds_max_vertices_422(self, client: TestClient):
+        # More than 100 points
+        huge_polygon = [[21.17 + i*0.0001, 72.83 + i*0.0001] for i in range(105)]
+        resp = client.post(
+            "/listings/search-boundary",
+            json={"polygon": huge_polygon},
+        )
+        assert resp.status_code == 422

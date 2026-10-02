@@ -20,9 +20,15 @@ from app.core.database import Base, get_db
 from app.main import app
 
 
-# Use the same DATABASE_URL as the app — the transaction-rollback strategy
-# means tests won't leave any persistent side-effects.
-engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
+db_url = settings.DATABASE_URL
+if db_url.startswith("postgresql://"):
+    try:
+        import psycopg
+        db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    except ImportError:
+        pass
+
+engine = create_engine(db_url, pool_pre_ping=True)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

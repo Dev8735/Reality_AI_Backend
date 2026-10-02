@@ -88,7 +88,8 @@ class ListingResponse(ListingBase):
                 else:
                     data["lat"] = point.y
                     data["lng"] = point.x
-            except Exception:
-                pass
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning("Failed to extract lat/lng from location geometry: %s", exc)
 
         return data
