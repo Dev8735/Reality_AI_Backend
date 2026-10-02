@@ -13,13 +13,15 @@
 
 ## 🚀 Key Features
 
-- 📍 **Spatial Boundary & Radius Search**: Native PostGIS queries (`ST_DWithin`, `ST_Contains`) supporting radius filtering and hand-drawn polygon boundary search with geometry validation.
-- 🔍 **Vector Similarity Search**: `pgvector` HNSW vector indexes supporting 384-dimensional embeddings for semantic search over listing descriptions and amenities.
-- 🔐 **Authentication & Security**: Role-based access control (`broker` vs `customer`) with OAuth2 + JWT authentication, password hashing (`passlib`/`bcrypt`), and token validation (`python-jose`).
+- 📍 **Spatial Boundary & Radius Search**: Native PostGIS queries (`ST_DWithin`, `ST_Contains`) supporting radius filtering with price/type constraints (`price_min`, `price_max`, `property_type`) and hand-drawn polygon boundary search with max-vertex validation (≤ 100 points).
+- ⚡ **Dual GiST Spatial Indexes**: Optimized PostGIS performance with `idx_listing_location` (Geometry GiST) and `idx_listing_location_geog` (Geography GiST) for instant spatial queries.
+- 🔍 **Vector Similarity Search**: `pgvector` vector indexes supporting 384-dimensional embeddings for semantic search over listing descriptions and amenities.
+- 🔐 **Authentication & Security**: Role-based access control (`broker` vs `customer`), unique email enforcement across roles, OAuth2 + JWT authentication, password hashing (`passlib`/`bcrypt`), and token validation (`python-jose`).
+- 💬 **Conversational Chat & Lead Tracking**: Customer-only AI chat (`POST /chat`) with automatic `Lead` creation when listings are recommended, and complete history recall (`GET /chat/{conversation_id}`) returning top-level and per-message listings.
 - 🤖 **AI RAG Orchestration**: Direct Python interface integration for Person 1's AI package (`ai.rag`, `ai.embeddings`, `ai.amenities`, `ai.inference`) with seamless fallback to `PLACEHOLDER_MODE`.
 - 🏬 **Amenities Caching Pipeline**: Automatic background caching of Google Places amenities (schools, hospitals, restaurants, transit, parks) and automatic listing re-embedding.
 - 📊 **Broker Analytics**: Analytics service reporting property metrics, total leads, and individual listing view counts.
-- 🐳 **Containerized & Automated Workflows**: Multi-stage Docker setup with healthcheck dependency waiting, automatic Alembic migrations, and synthetic data seeding script.
+- 🐳 **Containerized & Automated Workflows**: Multi-stage Docker setup with healthcheck dependency waiting, automatic Alembic migrations, and synthetic data seeding script generating 500+ Surat listings, leads, and sample chat sessions.
 
 ---
 
@@ -55,11 +57,12 @@
 │   │       └── listings.py       # POST /listings, GET /listings/{id}, GET /listings/search
 │   ├── core/
 │   │   ├── config.py             # Pydantic Settings & environment variables
-│   │   ├── database.py           # SQLAlchemy Engine & Session factory
+│   │   ├── database.py           # SQLAlchemy Engine & Session factory (psycopg v3/v2 auto-adapter)
 │   │   └── security.py           # Password hashing & JWT token creation/decoding
 │   ├── db/
 │   │   ├── init.sql              # Docker initialization script (PostGIS & pgvector setup)
-│   │   ├── seed_synthetic_data.py# Generator for synthetic Surat real estate listings
+│   │   ├── seed_synthetic_data.py# Generator for 500+ synthetic Surat listings, leads & chats
+│   │   ├── _explain_check.py     # EXPLAIN ANALYZE verification script for spatial indexes
 │   │   └── migrations/           # Alembic database migrations
 │   ├── models/                   # SQLAlchemy ORM models
 │   │   ├── broker.py             # Broker model
@@ -70,8 +73,8 @@
 │   ├── schemas/                  # Pydantic data validation schemas
 │   └── services/                 # Business logic layer
 │       ├── analytics_service.py  # Broker analytics queries
-│       ├── auth_service.py       # User registration & authentication logic
-│       ├── geo_service.py        # Spatial radius & boundary search logic
+│       ├── auth_service.py       # User registration (cross-role email uniqueness) & auth logic
+│       ├── geo_service.py        # Spatial radius (filtered) & boundary search logic
 │       └── listing_service.py    # Listing CRUD operations
 ├── tests/                        # Comprehensive Pytest test suite
 │   ├── test_analytics.py
@@ -83,7 +86,7 @@
 ├── alembic.ini                   # Alembic configuration
 ├── docker-compose.yml            # Multi-container orchestration (API + PostGIS DB + pgAdmin)
 ├── Dockerfile                    # Multi-stage Python 3.11 container build
-├── entrypoint.sh                 # Docker container startup script (wait for DB, migrate, launch)
+├── entrypoint.sh                 # Docker startup script (resilient DB wait loop, migrate, launch)
 ├── requirements.txt              # Production Python dependencies
 ├── seed_demo_user.py             # Quick seed script for test accounts
 ├── setup_local.py                # Setup script for non-Docker local environments
@@ -172,9 +175,9 @@ If you prefer to run the FastAPI app directly on your local system using Python 
    ```
    *This script enables `postgis` & `vector` extensions, creates tables, stamps Alembic, and sets up spatial indexes.*
 
-4. **Seed synthetic test data (Optional)**:
+4. **Seed synthetic test data (500 listings, leads & conversations)**:
    ```bash
-   python -m app.db.seed_synthetic_data
+   python -m app.db.seed_synthetic_data -n 500
    python seed_demo_user.py
    ```
 
@@ -185,7 +188,7 @@ If you prefer to run the FastAPI app directly on your local system using Python 
 
 ---
 
-## 🗄️ Database Schema & Migrations
+## 🗄️ Database Schema & Spatial Indexing
 
 ### Schema Overview
 
@@ -194,8 +197,14 @@ If you prefer to run the FastAPI app directly on your local system using Python 
 | `broker` | Real estate brokers | `id`, `name`, `email`, `phone_hash`, `password_hash`, `created_at` |
 | `customer` | Platform customers | `id`, `name`, `email`, `password_hash`, `created_at` |
 | `listing` | Property listings | `id`, `broker_id`, `title`, `description`, `price`, `property_type`, `location` (PostGIS `POINT`), `carpet_area`, `built_up_area`, `plot_area`, `floor_number`, `rooms`, `embedding` (vector), `amenities`, `created_at` |
-| `conversation` | Customer chat sessions | `id`, `customer_id`, `messages` (JSONB ISO history) |
+| `conversation` | Customer chat sessions | `id`, `customer_id`, `messages` (JSONB ISO history with listing IDs) |
 | `lead` | Property inquiry leads | `id`, `listing_id`, `customer_id`, `created_at` |
+
+### Spatial Indexing
+
+To ensure lightning-fast PostGIS performance, two GiST spatial indexes are created on `listing.location`:
+- `idx_listing_location`: Geometry GiST index for `ST_Contains` polygon queries.
+- `idx_listing_location_geog`: Functional Geography GiST index `(CAST(location AS geography))` for `ST_DWithin` radius queries.
 
 ### Database Migrations (Alembic)
 
@@ -218,16 +227,16 @@ Per the cross-team contract (`Reality-AI-AGENTS.md`), all endpoints adhere stric
 | Method | Endpoint | Access | Purpose |
 |---|---|---|---|
 | `GET` | `/` | Public | Health check status (`{"status": "ok"}`) |
-| `POST` | `/auth/register` | Public | Signup for broker or customer account |
+| `POST` | `/auth/register` | Public | Signup for broker or customer (enforces cross-role email uniqueness) |
 | `POST` | `/auth/login` | Public | Authenticate user & return JWT token |
 | `GET` | `/auth/me` | Bearer Auth | Fetch current authenticated user's profile |
 | `POST` | `/listings` | Broker Only | Publish a new listing & queue background AI tasks |
 | `GET` | `/listings/{id}` | Public | Get single listing details with cached amenities |
-| `GET` | `/listings/search` | Public | Search listings within radius (`lat`, `lng`, `radius_km`) |
-| `POST` | `/listings/search-boundary` | Public | Search listings inside polygon (`[[lat, lng], ...]`) |
-| `POST` | `/chat` | Customer Auth | Process chat message via RAG & LLM orchestration |
-| `GET` | `/chat/{conversation_id}` | Customer Auth | Fetch complete chat history for conversation |
-| `GET` | `/brokers/{id}/analytics` | Broker Auth | Fetch total listings, total leads, and view stats |
+| `GET` | `/listings/search` | Public | Radius search (`lat`, `lng`, `radius_km`) with optional `price_min`, `price_max`, `property_type` |
+| `POST` | `/listings/search-boundary` | Public | Polygon boundary search (`[[lat, lng], ...]`, max 100 vertices) |
+| `POST` | `/chat` | Customer Auth | Process customer chat message via RAG & LLM (creates `Lead` records) |
+| `GET` | `/chat/{conversation_id}` | Customer Auth | Fetch complete chat history (returns top-level & per-message `listings`) |
+| `GET` | `/brokers/{id}/analytics` | Broker Auth | Fetch total listings, total leads, and property metrics |
 
 ### Interactive OpenAPI Documentation
 
@@ -253,7 +262,7 @@ pytest -v -s
 
 Run specific test module:
 ```bash
-pytest tests/test_boundary_search.py
+pytest tests/test_boundary.py
 ```
 
 ---
